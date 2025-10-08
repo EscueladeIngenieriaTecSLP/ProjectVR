@@ -3,20 +3,15 @@
   <head>
     <title>UR3 WebAR</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <!-- A-Frame + AR.js -->
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/2.2.1/aframe/build/aframe-ar.js"></script>
     <style>
-      /* Overlay por si el navegador pide gesto del usuario */
-      #tapToStart {
-        position: fixed; inset: 0; display: none;
-        align-items: center; justify-content: center;
-        background: rgba(0,0,0,0.6); color: #fff; z-index: 9999;
-        font-family: system-ui, sans-serif; text-align: center; padding: 24px;
+      #tapToStart{
+        position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+        background:rgba(0,0,0,.6);color:#fff;z-index:9999;
+        font-family:system-ui,sans-serif;text-align:center;padding:24px;
       }
-      #tapToStart button {
-        padding: 12px 18px; font-size: 16px; border: 0; border-radius: 10px;
-      }
+      #tapToStart button{padding:12px 18px;font-size:16px;border:0;border-radius:10px;}
     </style>
   </head>
 
@@ -30,43 +25,36 @@
 
     <a-scene
       embedded
-      vr-mode-ui="enabled: false"
-      renderer="antialias: true; alpha: true"
-      arjs="sourceType: webcam; debugUIEnabled: false;"
+      vr-mode-ui="enabled:false"
+      renderer="antialias:true; alpha:true"
+      arjs="sourceType: webcam; debugUIEnabled:false;"
     >
-      <!-- Activos: el video debe cargarse antes de usarlo -->
-      <a-assets timeout="10000">
-        <!-- IMPORTANTES: muted, playsinline, webkit-playsinline, preload -->
+      <a-assets timeout="20000">
+        <!-- IMPORTANTE: sin src aquí; lo asignamos por JS después de setear flags -->
         <video id="ur3video"
-               src="ur3-video.mp4"
                preload="auto"
-               autoplay
                loop
                muted
                playsinline
                webkit-playsinline
-        ></video>
+               crossorigin="anonymous">
+        </video>
       </a-assets>
 
-      <!-- Marcador -->
       <a-marker type="pattern" url="marker.patt" id="marker">
-        <!-- Video en vertical (alto > ancho), plano paralelo al marcador -->
         <a-video id="videoPlane"
                  src="#ur3video"
-                 width="1"
-                 height="2"
+                 width="1" height="2"
                  position="0 0 0"
                  rotation="-90 0 0"
-                 autoplay="true"
-                 loop="true">
+                 autoplay="true" loop="true">
         </a-video>
 
-        <a-text
-          value="UR3: 6 DOF | 3kg | 500mm"
-          position="0 1.2 0"
-          rotation="-90 0 0"
-          scale="0.45 0.45 0.45"
-          color="red">
+        <a-text value="UR3: 6 DOF | 3kg | 500mm"
+                position="0 1.2 0"
+                rotation="-90 0 0"
+                scale="0.45 0.45 0.45"
+                color="red">
         </a-text>
       </a-marker>
 
@@ -74,49 +62,48 @@
     </a-scene>
 
     <script>
-      const video = document.getElementById('ur3video');
-      const marker = document.getElementById('marker');
+      const video   = document.getElementById('ur3video');
+      const marker  = document.getElementById('marker');
       const overlay = document.getElementById('tapToStart');
-      const startBtn = document.getElementById('startBtn');
+      const startBtn= document.getElementById('startBtn');
 
-      // Asegurar flags (algunos navegadores los ignoran si no están también vía JS)
+      // 1) Flags primero (Android es sensible al orden)
       video.muted = true;
-      video.playsInline = true;      // estándar
-      video.setAttribute('playsinline', 'true');
-      video.setAttribute('webkit-playsinline', 'true');
+      video.setAttribute('muted','');
+      video.playsInline = true;
+      video.setAttribute('playsinline','');
+      video.setAttribute('webkit-playsinline','');
 
-      // Función robusta para intentar reproducir
+      // 2) AHORA sí asignamos la fuente y cargamos
+      video.src = 'ur3-video.mp4';     // <-- tu ruta
+      video.load();
+
       async function tryPlay() {
         try {
           await video.play();
           overlay.style.display = 'none';
         } catch (e) {
-          // Si está bloqueado por políticas de autoplay, mostramos overlay
+          // Si falla autoplay, mostramos overlay para gesto del usuario
           overlay.style.display = 'flex';
         }
       }
 
-      // 1) Al encontrar el marcador: intentar reproducir
+      // Reforzamos con eventos de carga (Android a veces necesita estos)
+      ['loadedmetadata','canplay','canplaythrough','loadeddata'].forEach(evt => {
+        video.addEventListener(evt, () => { tryPlay(); }, { once:false });
+      });
+
+      // Al encontrar el marcador, intentamos reproducir
       marker.addEventListener('markerFound', tryPlay);
 
-      // 2) Reintentos en eventos típicos (a veces ayudan en iOS/Android)
-      document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) tryPlay();
-      });
+      // Reintentos útiles
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) tryPlay(); });
       window.addEventListener('focus', tryPlay);
 
-      // 3) Gesto del usuario si fue necesario
-      ['touchstart', 'click', 'pointerdown'].forEach(evt => {
-        document.addEventListener(evt, () => {
-          if (video.paused) tryPlay();
-        }, { once: true });
-      });
+      // Tap del usuario si fue requerido
       startBtn.addEventListener('click', tryPlay);
-
-      // 4) Por si el asset terminó de cargar después
-      video.addEventListener('loadeddata', () => {
-        // Si el marcador ya estaba a la vista, intenta de nuevo
-        tryPlay();
+      ['touchstart','pointerdown','click'].forEach(evt => {
+        document.addEventListener(evt, () => { if (video.paused) tryPlay(); }, { once:true });
       });
     </script>
   </body>
