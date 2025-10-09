@@ -2,173 +2,41 @@
 <html>
   <head>
     <title>UR3 WebAR</title>
-    <!-- Evita zoom automático en Android -->
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#000000"/>
-
-    <!-- A-Frame + AR.js -->
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/2.2.1/aframe/build/aframe-ar.js"></script>
-
-    <style>
-      /* Bloqueo de scroll/zoom y tamaño a pantalla completa */
-      html, body {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        width: 100%;
-        overflow: hidden;
-        touch-action: none;              /* evita pinch/double tap zoom */
-        -ms-touch-action: none;
-        overscroll-behavior: none;       /* evita “rebote” */
-        background: #000;
-      }
-
-      /* Asegura que el canvas ocupe toda la pantalla y no reciba gestos */
-      canvas, .a-canvas, .a-grab-cursor, .a-scene {
-        touch-action: none !important;
-      }
-
-      /* Overlay por si el navegador bloquea autoplay */
-      #tapToStart{
-        position:fixed;inset:0;display:none;align-items:center;justify-content:center;
-        background:rgba(0,0,0,.6);color:#fff;z-index:9999;
-        font-family:system-ui,sans-serif;text-align:center;padding:24px;
-      }
-      #tapToStart button{padding:12px 18px;font-size:16px;border:0;border-radius:10px;}
-    </style>
-
-    <script>
-      // 1) Fijar pixelRatio=1 para evitar escalados raros en Android
-      AFRAME.registerComponent('fix-pixelratio', {
-        init: function () {
-          this.el.sceneEl.addEventListener('rendererinitialized', () => {
-            try {
-              this.el.sceneEl.renderer.setPixelRatio(1);
-            } catch (e) {}
-          });
-        }
-      });
-
-      // 2) Prevenir gestos de zoom del navegador (pinch/double-tap en Android)
-      (function preventBrowserZoom() {
-        let lastTouchEnd = 0;
-
-        document.addEventListener('gesturestart', e => e.preventDefault());
-        document.addEventListener('gesturechange', e => e.preventDefault());
-        document.addEventListener('gestureend', e => e.preventDefault());
-
-        document.addEventListener('touchstart', e => {
-          if (e.touches.length > 1) e.preventDefault(); // pinch
-        }, {passive: false});
-
-        document.addEventListener('touchend', e => {
-          const now = Date.now();
-          if (now - lastTouchEnd <= 300) {
-            e.preventDefault(); // double-tap
-          }
-          lastTouchEnd = now;
-        }, {passive: false});
-
-        // Evita zoom con wheel (por si conectan mouse)
-        document.addEventListener('wheel', e => {
-          if (e.ctrlKey) e.preventDefault();
-        }, {passive: false});
-      })();
-    </script>
   </head>
 
-  <body>
-    <div id="tapToStart">
-      <div>
-        <p>🔒 Tu navegador bloqueó la reproducción automática.</p>
-        <button id="startBtn">Tocar para iniciar</button>
-      </div>
-    </div>
-
-    <a-scene
-      embedded
-      fix-pixelratio                       <!-- Aplica el pixelRatio=1 -->
-      vr-mode-ui="enabled:false"
-      renderer="antialias:true; alpha:true"
-      arjs="sourceType: webcam; debugUIEnabled:false;"
-    >
-      <a-assets timeout="20000">
-        <!-- Sin src al cargar; lo fijamos después de poner flags -->
-        <video id="ur3video"
-               preload="auto"
-               loop
-               muted
-               playsinline
-               webkit-playsinline
-               crossorigin="anonymous">
-        </video>
+  <body style="margin: 0; overflow: hidden;">
+    <a-scene embedded arjs>
+      <!-- Cargar los recursos -->
+      <a-assets>
+        <video id="ur3video" src="ur3-video.mp4" autoplay loop muted playsinline webkit-playsinline></video>
       </a-assets>
 
-      <a-marker type="pattern" url="marker.patt" id="marker">
-        <a-video id="videoPlane"
-                 src="#ur3video"
-                 width="1" height="2"
-                 position="0 0 0"
-                 rotation="-90 0 0"
-                 autoplay="true" loop="true">
-        </a-video>
+      <!-- Marcador -->
+      <a-marker type="pattern" url="marker.patt">
+        <!-- VIDEO EN VERTICAL -->
+        <a-video
+          src="#ur3video"
+          width="1"
+          height="2"           <!-- altura mayor que el ancho -->
+          position="0 0 0"
+          rotation="-90 0 0"   <!-- mantiene el plano paralelo al marcador -->
+          autoplay="true"
+          loop="true"
+        ></a-video>
 
-        <a-text value="UR3: 6 DOF | 3kg | 500mm"
-                position="0 1.2 0"
-                rotation="-90 0 0"
-                scale="0.45 0.45 0.45"
-                color="red">
-        </a-text>
+        <!-- Texto -->
+        <a-text
+          value="UR3: 6 DOF | 3kg payload | 500mm reach"
+          position="0 1.2 0"
+          rotation="-90 0 0"
+          scale="0.5 0.5 0.5"
+          color="red"
+        ></a-text>
       </a-marker>
 
       <a-entity camera></a-entity>
     </a-scene>
-
-    <script>
-      const video    = document.getElementById('ur3video');
-      const marker   = document.getElementById('marker');
-      const overlay  = document.getElementById('tapToStart');
-      const startBtn = document.getElementById('startBtn');
-
-      // Flags primero (Android es sensible al orden)
-      video.muted = true;
-      video.setAttribute('muted','');
-      video.playsInline = true;
-      video.setAttribute('playsinline','');
-      video.setAttribute('webkit-playsinline','');
-
-      // Ahora sí asignamos la fuente y cargamos
-      video.src = 'ur3-video.mp4';   // <-- tu ruta
-      video.load();
-
-      async function tryPlay() {
-        try {
-          await video.play();
-          overlay.style.display = 'none';
-        } catch (e) {
-          overlay.style.display = 'flex';
-        }
-      }
-
-      // Reintentos en cuanto el video esté listo
-      ['loadedmetadata','canplay','canplaythrough','loadeddata'].forEach(evt => {
-        video.addEventListener(evt, tryPlay, { once:false });
-      });
-
-      // Al encontrar el marcador
-      marker.addEventListener('markerFound', tryPlay);
-
-      // Reintentos útiles
-      document.addEventListener('visibilitychange', () => { if (!document.hidden) tryPlay(); });
-      window.addEventListener('focus', tryPlay);
-
-      // Gesto del usuario si fue necesario
-      startBtn.addEventListener('click', tryPlay);
-      ['touchstart','pointerdown','click'].forEach(evt => {
-        document.addEventListener(evt, () => { if (video.paused) tryPlay(); }, { once:true });
-      });
-    </script>
   </body>
 </html>
