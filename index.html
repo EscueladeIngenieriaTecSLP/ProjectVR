@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>UR3 WebAR</title>
+    <title>UR3 WebAR con sonido</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <!-- Librerías principales -->
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
@@ -12,27 +12,59 @@
         padding: 0;
         overflow: hidden;
         touch-action: none;
+        font-family: system-ui, sans-serif;
+      }
+
+      /* Pantalla inicial para pedir interacción del usuario */
+      #overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.85);
+        color: white;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+
+      #overlay button {
+        background-color: #ff3333;
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        font-size: 18px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+
+      #overlay button:hover {
+        background-color: #ff5555;
       }
     </style>
   </head>
 
   <body>
+    <!-- Overlay de inicio -->
+    <div id="overlay">
+      <p>🎧 Toca para iniciar el video con sonido</p>
+      <button id="startBtn">Reproducir</button>
+    </div>
+
+    <!-- Escena AR -->
     <a-scene embedded arjs>
-      <!-- Activos cargados primero -->
       <a-assets>
-        <!-- Video con autoplay, loop y muted (para móviles) -->
+        <!-- IMPORTANTE: ya no lleva muted -->
         <video 
           id="ur3video"
           src="ur3-video.mp4"
           preload="auto"
-          muted
           playsinline
           webkit-playsinline
           loop>
         </video>
       </a-assets>
 
-      <!-- Marcador con el video y texto -->
       <a-marker type="pattern" url="marker.patt" id="marker">
         <a-video
           src="#ur3video"
@@ -40,7 +72,6 @@
           height="2"
           position="0 0 0"
           rotation="-90 0 0"
-          autoplay="true"
           loop="true">
         </a-video>
 
@@ -57,36 +88,38 @@
     </a-scene>
 
     <script>
-      const marker = document.getElementById('marker');
       const video = document.getElementById('ur3video');
+      const marker = document.getElementById('marker');
+      const overlay = document.getElementById('overlay');
+      const startBtn = document.getElementById('startBtn');
 
-      // Asegurar flags (necesario en algunos navegadores móviles)
-      video.muted = true;
+      // Flags necesarios
       video.playsInline = true;
       video.setAttribute('playsinline', '');
       video.setAttribute('webkit-playsinline', '');
 
-      // Intentar reproducir cuando se detecta el marcador
-      marker.addEventListener('markerFound', () => {
-        const playPromise = video.play();
-        if (playPromise !== undefined) {
-          playPromise
-            .then(() => console.log('🎬 Video reproduciéndose'))
-            .catch((error) => {
-              console.warn('Autoplay bloqueado, se requiere interacción del usuario:', error);
-            });
+      // Reproducir el video con audio cuando el usuario toque el botón
+      startBtn.addEventListener('click', async () => {
+        try {
+          await video.play();
+          overlay.style.display = 'none';
+          console.log('🎬 Video con sonido reproducido');
+        } catch (err) {
+          alert('No se pudo reproducir el video con sonido: ' + err.message);
         }
       });
 
-      // Pausar cuando el marcador se pierde
+      // Al detectar el marcador, aseguramos que siga reproduciendo
+      marker.addEventListener('markerFound', () => {
+        if (video.paused) {
+          video.play().catch(err => console.warn('Error al reproducir:', err));
+        }
+      });
+
+      // Pausa el video al perder el marcador
       marker.addEventListener('markerLost', () => {
         video.pause();
       });
-
-      // Permitir iniciar manualmente con un toque si el navegador bloquea autoplay
-      document.addEventListener('touchstart', () => {
-        if (video.paused) video.play();
-      }, { once: true });
     </script>
   </body>
 </html>
