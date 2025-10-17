@@ -1,117 +1,224 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>WebAR | UFactory & ABB con sonido</title>
+    <title>UR3 WebAR</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <!-- Librerías principales -->
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
     <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/2.2.1/aframe/build/aframe-ar.js"></script>
     <style>
-      html, body { margin:0; padding:0; overflow:hidden; touch-action:none; font-family:system-ui, sans-serif; background:#000; }
-      #overlay {
-        position:fixed; inset:0; background:rgba(0,0,0,.85); color:#fff;
-        display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999;
+      body, html {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        touch-action: none;
       }
-      #overlay button { background:#ff3333; color:#fff; border:0; padding:12px 20px; font-size:18px; border-radius:8px; cursor:pointer; }
-      #overlay button:hover { background:#ff5555; }
     </style>
   </head>
 
   <body>
-    <!-- Botón para habilitar audio -->
-    <div id="overlay">
-      <p>🎧 Toca para habilitar el audio y reproducir los videos</p>
-      <button id="startBtn">Iniciar</button>
-    </div>
-
     <a-scene embedded arjs>
+      <!-- Activos cargados primero -->
       <a-assets>
-        <!-- Videos (con espacios codificados) -->
-        <video id="vidUFactory"
-               src="Ufactory%20video%20edit.mp4"
-               preload="auto"
-               playsinline webkit-playsinline
-               loop></video>
-
-        <video id="vidABB"
-               src="ABB%20VIDEO%20EDITADO.mp4"
-               preload="auto"
-               playsinline webkit-playsinline
-               loop></video>
+        <!-- Video con autoplay, loop y muted (para móviles) -->
+        <video 
+          id="ur3video"
+          src="ur3-video.mp4"
+          preload="auto"
+          muted
+          playsinline
+          webkit-playsinline
+          loop>
+        </video>
       </a-assets>
 
-      <!-- Marcador 1: UFactory -->
-      <a-marker id="markerUFactory" type="pattern" url="pattern-image1.patt">
-        <a-video src="#vidUFactory"
-                 width="1" height="2"
-                 position="0 0 0"
-                 rotation="-90 0 0"
-                 loop="true"></a-video>
-        <a-text value="UFactory Light 6"
-                position="0 1.2 0"
-                rotation="-90 0 0"
-                scale="0.45 0.45 0.45"
-                color="cyan"></a-text>
-      </a-marker>
+      <!-- Marcador con el video y texto -->
+      <a-marker type="pattern" url="marker.patt" id="marker">
+        <a-video
+          src="#ur3video"
+          width="1"
+          height="2"
+          position="0 0 0"
+          rotation="-90 0 0"
+          autoplay="true"
+          loop="true">
+        </a-video>
 
-      <!-- Marcador 2: ABB -->
-      <a-marker id="markerABB" type="pattern" url="pattern-image2.patt">
-        <a-video src="#vidABB"
-                 width="1" height="2"
-                 position="0 0 0"
-                 rotation="-90 0 0"
-                 loop="true"></a-video>
-        <a-text value="ABB IRB 140"
-                position="0 1.2 0"
-                rotation="-90 0 0"
-                scale="0.45 0.45 0.45"
-                color="orange"></a-text>
+        <a-text
+          value="UR3: 6 DOF | 3kg payload | 500mm reach"
+          position="0 1.2 0"
+          rotation="-90 0 0"
+          scale="0.4 0.4 0.4"
+          color="red">
+        </a-text>
       </a-marker>
 
       <a-entity camera></a-entity>
     </a-scene>
 
     <script>
-      const overlay = document.getElementById('overlay');
-      const startBtn = document.getElementById('startBtn');
+      const marker = document.getElementById('marker');
+      const video = document.getElementById('ur3video');
 
-      const vidUFactory = document.getElementById('vidUFactory');
-      const vidABB      = document.getElementById('vidABB');
+      // Asegurar flags (necesario en algunos navegadores móviles)
+      video.muted = true;
+      video.playsInline = true;
+      video.setAttribute('playsinline', '');
+      video.setAttribute('webkit-playsinline', '');
 
-      const markerUFactory = document.getElementById('markerUFactory');
-      const markerABB      = document.getElementById('markerABB');
-
-      // Recomendado: asegurar flags también por JS
-      [vidUFactory, vidABB].forEach(v => {
-        v.playsInline = true;
-        v.setAttribute('playsinline', '');
-        v.setAttribute('webkit-playsinline', '');
-      });
-
-      // Reproducir con sonido tras interacción del usuario
-      startBtn.addEventListener('click', async () => {
-        try {
-          await Promise.all([vidUFactory.play(), vidABB.play()]);
-          overlay.style.display = 'none';
-        } catch (err) {
-          alert('No se pudo iniciar con sonido: ' + err.message);
+      // Intentar reproducir cuando se detecta el marcador
+      marker.addEventListener('markerFound', () => {
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => console.log('🎬 Video reproduciéndose'))
+            .catch((error) => {
+              console.warn('Autoplay bloqueado, se requiere interacción del usuario:', error);
+            });
         }
       });
 
-      // Cada marcador controla su propio video
-      markerUFactory.addEventListener('markerFound', () => { if (vidUFactory.paused) vidUFactory.play(); });
-      markerUFactory.addEventListener('markerLost',  () => { vidUFactory.pause(); });
+      // Pausar cuando el marcador se pierde
+      marker.addEventListener('markerLost', () => {
+        video.pause();
+      });
 
-      markerABB.addEventListener('markerFound', () => { if (vidABB.paused) vidABB.play(); });
-      markerABB.addEventListener('markerLost',  () => { vidABB.pause(); });
+      // Permitir iniciar manualmente con un toque si el navegador bloquea autoplay
+      document.addEventListener('touchstart', () => {
+        if (video.paused) video.play();
+      }, { once: true });
+    </script>
+  </body>
+</html> con ese codigo has que el video se escuche
+ChatGPT said:
 
-      // Extra: si quieres que SOLO suene el que está visible, descomenta:
-      /*
-      markerUFactory.addEventListener('markerFound', () => { vidABB.muted = true; vidUFactory.muted = false; });
-      markerABB.addEventListener('markerFound', () => { vidUFactory.muted = true; vidABB.muted = false; });
-      // Al perder ambos, puedes mutear ambos si gustas:
-      markerUFactory.addEventListener('markerLost', () => { vidUFactory.muted = true; });
-      markerABB.addEventListener('markerLost', () => { vidABB.muted = true; });
-      */
+Perfecto 🎧
+Para que tu video se escuche, hay que quitar muted y pedir un toque del usuario, ya que los navegadores móviles (Android/iOS) bloquean la reproducción con audio automática por políticas de privacidad.
+
+Aquí te dejo una versión actualizada de tu código, con un botón de “Reproducir con sonido” que inicia el video con audio habilitado 👇
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>UR3 WebAR con sonido</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <!-- Librerías principales -->
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.rawgit.com/jeromeetienne/AR.js/2.2.1/aframe/build/aframe-ar.js"></script>
+    <style>
+      body, html {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        touch-action: none;
+        font-family: system-ui, sans-serif;
+      }
+
+      /* Pantalla inicial para pedir interacción del usuario */
+      #overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.85);
+        color: white;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+
+      #overlay button {
+        background-color: #ff3333;
+        color: white;
+        border: none;
+        padding: 12px 20px;
+        font-size: 18px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+
+      #overlay button:hover {
+        background-color: #ff5555;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- Overlay de inicio -->
+    <div id="overlay">
+      <p>🎧 Toca para iniciar el video con sonido</p>
+      <button id="startBtn">Reproducir</button>
+    </div>
+
+    <!-- Escena AR -->
+    <a-scene embedded arjs>
+      <a-assets>
+        <!-- IMPORTANTE: ya no lleva muted -->
+        <video 
+          id="ur3video"
+          src="ur3-video.mp4"
+          preload="auto"
+          playsinline
+          webkit-playsinline
+          loop>
+        </video>
+      </a-assets>
+
+      <a-marker type="pattern" url="marker.patt" id="marker">
+        <a-video
+          src="#ur3video"
+          width="1"
+          height="2"
+          position="0 0 0"
+          rotation="-90 0 0"
+          loop="true">
+        </a-video>
+
+        <a-text
+          value="UR3: 6 DOF | 3kg payload | 500mm reach"
+          position="0 1.2 0"
+          rotation="-90 0 0"
+          scale="0.4 0.4 0.4"
+          color="red">
+        </a-text>
+      </a-marker>
+
+      <a-entity camera></a-entity>
+    </a-scene>
+
+    <script>
+      const video = document.getElementById('ur3video');
+      const marker = document.getElementById('marker');
+      const overlay = document.getElementById('overlay');
+      const startBtn = document.getElementById('startBtn');
+
+      // Flags necesarios
+      video.playsInline = true;
+      video.setAttribute('playsinline', '');
+      video.setAttribute('webkit-playsinline', '');
+
+      // Reproducir el video con audio cuando el usuario toque el botón
+      startBtn.addEventListener('click', async () => {
+        try {
+          await video.play();
+          overlay.style.display = 'none';
+          console.log('🎬 Video con sonido reproducido');
+        } catch (err) {
+          alert('No se pudo reproducir el video con sonido: ' + err.message);
+        }
+      });
+
+      // Al detectar el marcador, aseguramos que siga reproduciendo
+      marker.addEventListener('markerFound', () => {
+        if (video.paused) {
+          video.play().catch(err => console.warn('Error al reproducir:', err));
+        }
+      });
+
+      // Pausa el video al perder el marcador
+      marker.addEventListener('markerLost', () => {
+        video.pause();
+      });
     </script>
   </body>
 </html>
