@@ -1,4 +1,4 @@
-# ProjectVR
+# UR3 Robot
 UR3 WebAR Project
 
 Instructions:
